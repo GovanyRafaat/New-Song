@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>New Song</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="top-bar">
+  <div class="menu-icon" onclick="toggleMenu()">☰</div>
+  <div class="title">New Song</div>
+</header>
+
+<!-- القائمة الجانبية -->
+<div id="sideMenu" class="side-menu">
+
+  <div class="menu-section expandable" onclick="toggleDisplayOptions()">
+    العرض
+  </div>
+
+  <div id="displayOptions" class="submenu">
+
+    <div class="menu-item">
+      نوع العرض
+      <select id="viewMode">
+        <option value="slides">شرائح</option>
+        <option value="single">سطر واحد</option>
+      </select>
+    </div>
+
+    <div class="menu-item">
+      خلفية العرض
+      <select id="bgColor">
+        <option value="black">أسود</option>
+        <option value="white">أبيض</option>
+      </select>
+    </div>
+
+    <div class="menu-item toggle-row">
+      ظل النص
+      <label class="switch">
+        <input type="checkbox" id="textShadowToggle">
+        <span class="slider"></span>
+      </label>
+    </div>
+
+    <div class="menu-item">
+      لون الخط
+      <input type="color" id="fontColor" value="#ffffff">
+    </div>
+
+  </div>
+
+</div>
+
+<main>
+
+<div class="search-box">
+  <input type="text" id="searchInput" placeholder="ابحث عن ترنيمة...">
+</div>
+
+<div class="list-box">
+  <div class="list-header">القائمة الافتراضية</div>
+  <div id="songsContainer"></div>
+</div>
+
+</main>
+
+<div id="presentation" class="presentation" aria-hidden="true">
+  <div class="presentation-header">
+    <div class="presentation-title" id="presentationTitle"></div>
+  </div>
+  <div class="presentation-body">
+    <div id="hymnContainer" class="hymn-container">
+      <div id="lineDisplay" class="line-display"></div>
+    </div>
+  </div>
+ </div>
+
+<script src="script.js"></script>
+</body>
+</html>
