@@ -279,8 +279,35 @@ function scrollActiveIntoView() {}
 
 function updatePresentationFormatting() {
   if (!presentationEl.classList.contains("active")) return;
-  lineDisplay.style.color = "#ffffff";
-  lineDisplay.style.textShadow = currentShadow ? "2px 2px 5px black" : "none";
+
+  // لون الخلفية للعرض فقط
+  const bgSelect = document.getElementById("bgColor").value;
+
+if (bgSelect === "black") {
+  presentationEl.style.background = "#000000";
+} else if (bgSelect === "white") {
+  presentationEl.style.background = "#ffffff";
+} else if (bgSelect === "green") {
+  presentationEl.style.background = "#00ff00"; // جرين سكرين صافي
+}
+
+  // لون الخط
+  lineDisplay.style.color = currentFontColor;
+
+  // ظل النص
+  lineDisplay.style.textShadow =
+    currentShadow ? "2px 2px 5px black" : "none";
+
+  // نوع العرض
+  const viewMode = document.getElementById("viewMode").value;
+
+  if (viewMode === "single") {
+    lineDisplay.style.whiteSpace = "nowrap";
+    lineDisplay.style.fontSize = "15vh";
+  } else {
+    lineDisplay.style.whiteSpace = "pre-wrap";
+    lineDisplay.style.fontSize = "12vh";
+  }
 }
 
 window.addEventListener("keydown", function (e) {
