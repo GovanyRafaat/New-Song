@@ -288,8 +288,18 @@ if (viewMode === "slides") {
   currentLines = slides;
 
 } else {
-  // وضع سطر (النظام القديم)
-  currentLines = getSongLines(song);
+  // وضع سطر واحد = 5 كلمات لكل سلايد
+
+  const fullText = getSongLines(song).join(" ");
+  const words = fullText.split(/\s+/);
+
+  const grouped = [];
+
+  for (let i = 0; i < words.length; i += 5) {
+    grouped.push(words.slice(i, i + 5).join(" "));
+  }
+
+  currentLines = grouped;
 }
   activeIndex = 0;
   if (song._matchIndex !== undefined) {
