@@ -56,8 +56,17 @@ document.getElementById("searchInput").addEventListener("input", function () {
   }
   let q = normalizeArabic(value);
   q = expandAbbreviations(q);
-  const matches = songs.filter(s => s._searchText.includes(q));
-  displaySongs(matches);
+const matches = songs
+  .map(song => {
+    const index = song._searchText.indexOf(q);
+    if (index !== -1) {
+      return { ...song, _matchIndex: index };
+    }
+    return null;
+  })
+  .filter(Boolean);
+
+ displaySongs(matches);
 });
 
 /* القائمة */
@@ -247,8 +256,50 @@ function prepareSearchFields(song) {
 }
 function openPresentation(song) {
   currentSong = song;
+const viewMode = document.getElementById("viewMode").value;
+
+if (viewMode === "slides") {
+  // عرض زي ما هو في الداتا (الفقرة كاملة شريحة واحدة)
+  const slides = [];
+
+  const chorus = Array.isArray(song.chorus) ? song.chorus : [];
+  const verses = Array.isArray(song.verses) ? song.verses : [];
+
+  if (song.chorusFirst && chorus.length) {
+    chorus.forEach(c => slides.push(c));
+  }
+
+  verses.forEach(v => {
+    if (Array.isArray(v)) {
+      slides.push(v.join("\n"));
+    } else {
+      slides.push(v);
+    }
+
+    if (chorus.length) {
+      chorus.forEach(c => slides.push(c));
+    }
+  });
+
+  if (!verses.length && chorus.length) {
+    chorus.forEach(c => slides.push(c));
+  }
+
+  currentLines = slides;
+
+} else {
+  // وضع سطر (النظام القديم)
   currentLines = getSongLines(song);
+}
   activeIndex = 0;
+  if (song._matchIndex !== undefined) {
+  const q = normalizeArabic(document.getElementById("searchInput").value);
+  const normalizedLines = currentLines.map(l => normalizeArabic(l));
+  const foundIndex = normalizedLines.findIndex(l => l.includes(q));
+  if (foundIndex !== -1) {
+    activeIndex = foundIndex;
+  }
+}
   presentationTitle.textContent = song.title || song.name || "";
   lineDisplay.textContent = currentLines[activeIndex] || "";
   presentationEl.classList.add("active");
@@ -288,7 +339,7 @@ if (bgSelect === "black") {
 } else if (bgSelect === "white") {
   presentationEl.style.background = "#ffffff";
 } else if (bgSelect === "green") {
-  presentationEl.style.background = "#00ff00"; // جرين سكرين صافي
+  presentationEl.style.background = "#00ff00"; 
 }
 
   // لون الخط
