@@ -161,6 +161,10 @@ body.black-bg {
   background: #000000 !important;
 }
 
+body.green-bg {
+  background: #00ff00 !important;
+}
+
 .presentation {
   position: fixed;
   inset: 0;

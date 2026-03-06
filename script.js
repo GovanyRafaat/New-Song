@@ -101,19 +101,25 @@ document.getElementById("viewMode").addEventListener("change", function () {
   } else {
     document.body.classList.remove("single-line");
   }
-  updatePresentationFormatting();
+  
+  if (currentSong) {
+    // حفظ السلايد الحالي أو البدء من جديد؟
+    // الأفضل إعادة بناء السلايدات بناء على النوع الجديد
+    openPresentation(currentSong);
+  }
 });
 
 /* الخلفية */
 
 document.getElementById("bgColor").addEventListener("change", function () {
-
-  document.body.classList.remove("white-bg", "black-bg");
+  document.body.classList.remove("white-bg", "black-bg", "green-bg");
 
   if (this.value === "black") {
     document.body.classList.add("black-bg");
-  } else {
+  } else if (this.value === "white") {
     document.body.classList.add("white-bg");
+  } else if (this.value === "green") {
+    document.body.classList.add("green-bg");
   }
 
   updatePresentationFormatting();
@@ -256,60 +262,84 @@ function prepareSearchFields(song) {
 }
 function openPresentation(song) {
   currentSong = song;
-const viewMode = document.getElementById("viewMode").value;
-
-if (viewMode === "slides") {
-  // عرض زي ما هو في الداتا (الفقرة كاملة شريحة واحدة)
+  const viewMode = document.getElementById("viewMode").value;
   const slides = [];
+
+  // Helper to split text into EXACTLY 4 words per chunk
+  function splitToFourWords(text) {
+    if (!text) return [];
+    
+    // Normalize spaces and split by single spaces to be safe
+    const cleanText = text.replace(/\s+/g, " ").trim();
+    const words = cleanText.split(" ").filter(Boolean);
+    const result = [];
+    
+    for (let i = 0; i < words.length; i += 4) {
+      result.push(words.slice(i, i + 4).join(" "));
+    }
+    return result;
+  }
+
+  // Helper to add a section (verse or chorus)
+  function addSection(section) {
+    if (!section) return;
+    let text = "";
+    if (Array.isArray(section)) {
+      // If it's an array of lines, join them with a space to treat as one block for word counting
+      text = section.join(" ");
+    } else {
+      text = section;
+    }
+
+    if (!text.trim()) return;
+
+    if (viewMode === "slides") {
+      // Slides mode: One bracket (section) = One slide
+      // But we should still respect the original line breaks if possible
+      if (Array.isArray(section)) {
+        slides.push(section.join("\n"));
+      } else {
+        slides.push(text);
+      }
+    } else {
+      // Single Line mode: Exactly 4 words per slide
+      const chunks = splitToFourWords(text);
+      chunks.forEach(c => slides.push(c));
+    }
+  }
 
   const chorus = Array.isArray(song.chorus) ? song.chorus : [];
   const verses = Array.isArray(song.verses) ? song.verses : [];
 
+  // Presentation order
   if (song.chorusFirst && chorus.length) {
-    chorus.forEach(c => slides.push(c));
+    chorus.forEach(c => addSection(c));
   }
 
   verses.forEach(v => {
-    if (Array.isArray(v)) {
-      slides.push(v.join("\n"));
-    } else {
-      slides.push(v);
-    }
-
+    addSection(v);
     if (chorus.length) {
-      chorus.forEach(c => slides.push(c));
+      chorus.forEach(c => addSection(c));
     }
   });
 
-  if (!verses.length && chorus.length) {
-    chorus.forEach(c => slides.push(c));
+  if (!verses.length && !song.chorusFirst && chorus.length) {
+    chorus.forEach(c => addSection(c));
   }
 
   currentLines = slides;
-
-} else {
-  // وضع سطر واحد = 5 كلمات لكل سلايد
-
-  const fullText = getSongLines(song).join(" ");
-  const words = fullText.split(/\s+/);
-
-  const grouped = [];
-
-  for (let i = 0; i < words.length; i += 5) {
-    grouped.push(words.slice(i, i + 5).join(" "));
-  }
-
-  currentLines = grouped;
-}
   activeIndex = 0;
-  if (song._matchIndex !== undefined) {
-  const q = normalizeArabic(document.getElementById("searchInput").value);
-  const normalizedLines = currentLines.map(l => normalizeArabic(l));
-  const foundIndex = normalizedLines.findIndex(l => l.includes(q));
-  if (foundIndex !== -1) {
-    activeIndex = foundIndex;
+
+  // Search matching to start at the right slide
+  const searchInput = document.getElementById("searchInput");
+  if (searchInput && searchInput.value.trim()) {
+    const q = normalizeArabic(searchInput.value.trim());
+    const foundIndex = currentLines.findIndex(l => normalizeArabic(l).includes(q));
+    if (foundIndex !== -1) {
+      activeIndex = foundIndex;
+    }
   }
-}
+
   presentationTitle.textContent = song.title || song.name || "";
   lineDisplay.textContent = currentLines[activeIndex] || "";
   presentationEl.classList.add("active");
@@ -341,33 +371,30 @@ function scrollActiveIntoView() {}
 function updatePresentationFormatting() {
   if (!presentationEl.classList.contains("active")) return;
 
-  // لون الخلفية للعرض فقط
+  // لون الخلفية
   const bgSelect = document.getElementById("bgColor").value;
-
-if (bgSelect === "black") {
-  presentationEl.style.background = "#000000";
-} else if (bgSelect === "white") {
-  presentationEl.style.background = "#ffffff";
-} else if (bgSelect === "green") {
-  presentationEl.style.background = "#00ff00"; 
-}
+  if (bgSelect === "black") {
+    presentationEl.style.backgroundColor = "#000000";
+  } else if (bgSelect === "white") {
+    presentationEl.style.backgroundColor = "#ffffff";
+  } else if (bgSelect === "green") {
+    presentationEl.style.backgroundColor = "#00ff00";
+  }
 
   // لون الخط
   lineDisplay.style.color = currentFontColor;
 
   // ظل النص
-  lineDisplay.style.textShadow =
-    currentShadow ? "2px 2px 5px black" : "none";
+  lineDisplay.style.textShadow = currentShadow ? "2px 2px 5px rgba(0,0,0,0.8)" : "none";
 
-  // نوع العرض
+  // نوع العرض (تعديل الحجم والمسافات)
   const viewMode = document.getElementById("viewMode").value;
-
   if (viewMode === "single") {
-    lineDisplay.style.whiteSpace = "nowrap";
     lineDisplay.style.fontSize = "15vh";
+    lineDisplay.style.whiteSpace = "pre-wrap"; // Changed from nowrap to pre-wrap for better fitting
   } else {
-    lineDisplay.style.whiteSpace = "pre-wrap";
     lineDisplay.style.fontSize = "12vh";
+    lineDisplay.style.whiteSpace = "pre-wrap";
   }
 }
 
