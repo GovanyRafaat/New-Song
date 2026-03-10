@@ -1,24 +1,29 @@
 let songs = [];
+let bible = [];
 let currentFontColor = "#ffffff";
 let currentShadow = false;
 
 /* تحميل البيانات */
-async function loadSongs() {
+async function loadData() {
   try {
-    const response = await fetch("tasbe7naDB.json");
-    songs = await response.json();
+    const responseSongs = await fetch("tasbe7naDB.json");
+    songs = await responseSongs.json();
     songs = songs.map(s => prepareSearchFields(s));
-    displaySongs([]);
+    
+    const responseBible = await fetch("bible.json");
+    bible = await responseBible.json();
+    
+    displayResults([]);
   } catch (error) {
-    console.log("فشل تحميل JSON");
+    console.log("فشل تحميل البيانات", error);
   }
 }
 
-loadSongs();
+loadData();
 
-/* عرض الترانيم */
+/* عرض النتائج */
 
-function displaySongs(list) {
+function displayResults(list) {
   const container = document.getElementById("songsContainer");
   container.innerHTML = "";
 
@@ -27,19 +32,26 @@ function displaySongs(list) {
     return;
   }
 
-  list.forEach(song => {
+  list.forEach(item => {
     const div = document.createElement("div");
     div.className = "song";
 
-    const title = song.title || song.name || "ترنيمة";
-    div.textContent = title;
+    // إذا كان العنصر من الكتاب المقدس
+    if (item.isBible) {
+      div.textContent = `${item.bookName} ${item.chapterNumber}`;
+      div.addEventListener("click", function () {
+        openBiblePresentation(item);
+      });
+    } else {
+      const title = item.title || item.name || "ترنيمة";
+      div.textContent = title;
+      div.addEventListener("click", function () {
+        openPresentation(item);
+      });
+    }
 
     div.style.color = "#000000";
     div.style.textShadow = "none";
-
-    div.addEventListener("click", function () {
-      openPresentation(song);
-    });
 
     container.appendChild(div);
   });
@@ -51,22 +63,67 @@ document.getElementById("searchInput").addEventListener("input", function () {
   const value = this.value.trim().toLowerCase();
 
   if (value.length === 0) {
-    displaySongs([]);
+    displayResults([]);
     return;
   }
-  let q = normalizeArabic(value);
-  q = expandAbbreviations(q);
-const matches = songs
-  .map(song => {
-    const index = song._searchText.indexOf(q);
-    if (index !== -1) {
-      return { ...song, _matchIndex: index };
-    }
-    return null;
-  })
-  .filter(Boolean);
 
- displaySongs(matches);
+  let q = normalizeArabic(value);
+  let expandedQ = expandAbbreviations(q);
+  
+  // 1. بحث في الترانيم
+  const hymnMatches = songs
+    .map(song => {
+      const index = song._searchText.indexOf(expandedQ);
+      if (index !== -1) {
+        return { ...song, _matchIndex: index };
+      }
+      return null;
+    })
+    .filter(Boolean);
+
+  // 2. بحث في الكتاب المقدس (كتب وأصحاحات)
+  const bibleMatches = [];
+  const bibleQueryTokens = expandedQ.split(" ").filter(Boolean);
+  
+  if (bibleQueryTokens.length > 0) {
+    const bookSearchName = bibleQueryTokens[0];
+    const chapterSearchNumber = bibleQueryTokens[1] ? parseInt(bibleQueryTokens[1]) : null;
+
+    bible.forEach(testament => {
+      testament.books.forEach(book => {
+        const normalizedBookName = normalizeArabic(book.name);
+        
+        // إذا كان اسم الكتاب يبدأ بالكلمة الأولى في البحث
+        if (normalizedBookName.startsWith(bookSearchName)) {
+          if (chapterSearchNumber !== null) {
+            // إذا تم تحديد رقم أصحاح
+            const chapter = book.chapters.find(c => c.number === chapterSearchNumber);
+            if (chapter) {
+              bibleMatches.push({
+                isBible: true,
+                bookName: book.name,
+                chapterNumber: chapter.number,
+                verses: chapter.verses
+              });
+            }
+          } else {
+            // إذا لم يتم تحديد أصحاح، أظهر كل الأصحاحات المتاحة لهذا الكتاب (كأمثلة أو الكل؟)
+            // لنظهر أول 5 أصحاحات مثلاً لتجنب الزحمة، أو الأصحاح الأول فقط
+            book.chapters.slice(0, 5).forEach(chapter => {
+              bibleMatches.push({
+                isBible: true,
+                bookName: book.name,
+                chapterNumber: chapter.number,
+                verses: chapter.verses
+              });
+            });
+          }
+        }
+      });
+    });
+  }
+
+  displayResults([...bibleMatches, ...hymnMatches]);
 });
 
 /* القائمة */
@@ -95,18 +152,27 @@ function toggleDisplayOptions() {
 
 /* نوع العرض */
 
-document.getElementById("viewMode").addEventListener("change", function () {
-  if (this.value === "single") {
-    document.body.classList.add("single-line");
-  } else {
-    document.body.classList.remove("single-line");
-  }
-  
-  if (currentSong) {
-    // حفظ السلايد الحالي أو البدء من جديد؟
-    // الأفضل إعادة بناء السلايدات بناء على النوع الجديد
-    openPresentation(currentSong);
-  }
+let viewMode = "single"; // 'single' or 'slides'
+
+const singleModeBtn = document.getElementById("viewModeSingle");
+const slidesModeBtn = document.getElementById("viewModeSlides");
+
+singleModeBtn.addEventListener("click", () => {
+  if (viewMode === "single") return;
+  viewMode = "single";
+  singleModeBtn.classList.add("selected");
+  slidesModeBtn.classList.remove("selected");
+  if (currentSong) openPresentation(currentSong);
+  else if (currentBibleItem) openBiblePresentation(currentBibleItem);
+});
+
+slidesModeBtn.addEventListener("click", () => {
+  if (viewMode === "slides") return;
+  viewMode = "slides";
+  slidesModeBtn.classList.add("selected");
+  singleModeBtn.classList.remove("selected");
+  if (currentSong) openPresentation(currentSong);
+  else if (currentBibleItem) openBiblePresentation(currentBibleItem);
 });
 
 /* الخلفية */
@@ -129,7 +195,11 @@ document.getElementById("bgColor").addEventListener("change", function () {
 
 document.getElementById("textShadowToggle").addEventListener("change", function () {
   currentShadow = this.checked;
-  displaySongs(songs);
+  // Use the search input value to refresh results if needed, or just clear
+  const searchVal = document.getElementById("searchInput").value;
+  if (searchVal) {
+    document.getElementById("searchInput").dispatchEvent(new Event('input'));
+  }
   updatePresentationFormatting();
 });
 
@@ -137,11 +207,11 @@ document.getElementById("textShadowToggle").addEventListener("change", function 
 
 document.getElementById("fontColor").addEventListener("input", function () {
   currentFontColor = this.value;
-  displaySongs(songs);
   updatePresentationFormatting();
 });
 
 let currentSong = null;
+let currentBibleItem = null;
 let currentLines = [];
 let activeIndex = 0;
 let numberBuffer = "";
@@ -260,24 +330,72 @@ function prepareSearchFields(song) {
     _searchText: normalizeArabic(text)
   };
 }
+function openBiblePresentation(bibleItem) {
+  currentBibleItem = bibleItem;
+  currentSong = null; // حتى لا تتعارض مع الترانيم
+  const slides = [];
+
+  // دالة مساعدة لتقسيم النص لـ 4 كلمات
+  function splitToFourWords(text) {
+    if (!text) return [];
+    const cleanText = text.replace(/\s+/g, " ").trim();
+    const words = cleanText.split(" ").filter(Boolean);
+    const result = [];
+    for (let i = 0; i < words.length; i += 4) {
+      result.push(words.slice(i, i + 4).join(" "));
+    }
+    return result;
+  }
+
+  // إذا كان نوع العرض "شرائح"، تظهر كل آية في شريحة مستقلة
+  if (viewMode === "slides") {
+    bibleItem.verses.forEach(v => {
+      slides.push(`(${v.number}) ${v.text}`);
+    });
+  } else {
+    // وضع "سطر واحد" = 4 كلمات لكل شريحة
+    bibleItem.verses.forEach(v => {
+      const verseText = `(${v.number}) ${v.text}`;
+      const chunks = splitToFourWords(verseText);
+      chunks.forEach(c => slides.push(c));
+    });
+  }
+
+  currentLines = slides;
+  activeIndex = 0;
+
+  presentationTitle.textContent = `${bibleItem.bookName} ${bibleItem.chapterNumber}`;
+  lineDisplay.textContent = currentLines[activeIndex] || "";
+  presentationEl.classList.add("active");
+  updatePresentationFormatting();
+}
+
 function openPresentation(song) {
   currentSong = song;
-  const viewMode = document.getElementById("viewMode").value;
+  currentBibleItem = null; // حتى لا تتعارض مع الكتاب المقدس
   const slides = [];
 
   // Helper to split text into EXACTLY 4 words per chunk
   function splitToFourWords(text) {
     if (!text) return [];
-    
-    // Normalize spaces and split by single spaces to be safe
     const cleanText = text.replace(/\s+/g, " ").trim();
     const words = cleanText.split(" ").filter(Boolean);
     const result = [];
-    
     for (let i = 0; i < words.length; i += 4) {
       result.push(words.slice(i, i + 4).join(" "));
     }
     return result;
+  }
+
+  // Helper to format text with 6 words per line
+  function formatSixWordsPerLine(text) {
+    if (!text) return "";
+    const words = text.trim().split(/\s+/).filter(Boolean);
+    const lines = [];
+    for (let i = 0; i < words.length; i += 6) {
+      lines.push(words.slice(i, i + 6).join(" "));
+    }
+    return lines.join("\n");
   }
 
   // Helper to add a section (verse or chorus)
@@ -285,7 +403,6 @@ function openPresentation(song) {
     if (!section) return;
     let text = "";
     if (Array.isArray(section)) {
-      // If it's an array of lines, join them with a space to treat as one block for word counting
       text = section.join(" ");
     } else {
       text = section;
@@ -295,12 +412,8 @@ function openPresentation(song) {
 
     if (viewMode === "slides") {
       // Slides mode: One bracket (section) = One slide
-      // But we should still respect the original line breaks if possible
-      if (Array.isArray(section)) {
-        slides.push(section.join("\n"));
-      } else {
-        slides.push(text);
-      }
+      // Apply 6-word per line formatting
+      slides.push(formatSixWordsPerLine(text));
     } else {
       // Single Line mode: Exactly 4 words per slide
       const chunks = splitToFourWords(text);
@@ -349,6 +462,7 @@ function openPresentation(song) {
 function closePresentation() {
   presentationEl.classList.remove("active");
   currentSong = null;
+  currentBibleItem = null;
   currentLines = [];
   activeIndex = 0;
 }
@@ -388,10 +502,9 @@ function updatePresentationFormatting() {
   lineDisplay.style.textShadow = currentShadow ? "2px 2px 5px rgba(0,0,0,0.8)" : "none";
 
   // نوع العرض (تعديل الحجم والمسافات)
-  const viewMode = document.getElementById("viewMode").value;
   if (viewMode === "single") {
     lineDisplay.style.fontSize = "15vh";
-    lineDisplay.style.whiteSpace = "pre-wrap"; // Changed from nowrap to pre-wrap for better fitting
+    lineDisplay.style.whiteSpace = "pre-wrap"; 
   } else {
     lineDisplay.style.fontSize = "12vh";
     lineDisplay.style.whiteSpace = "pre-wrap";
